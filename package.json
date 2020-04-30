@@ -1,0 +1,14 @@
+{
+  "name": "mumbleradio",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^0.19.2",
+    "d3-array": "^2.4.0",
+    "dotenv": "^8.2.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "noodle.js": "^1.3.0",
+    "ytdl-core": "^2.1.1"
+  }
+}
