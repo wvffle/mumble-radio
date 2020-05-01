@@ -4,19 +4,28 @@ import d3 from 'd3-array'
 import ytdl from 'ytdl-core'
 import ffmpeg from 'fluent-ffmpeg'
 import dotenv from 'dotenv'
+import { stringify as qs } from 'querystring'
 
 dotenv.config()
 
 const {
-  YOUTUBE_API_KEY: API_KEY,
   PLAYLIST = 'PLl2JADJwpokG_bQWijyL6td759TiIhGhw',
   NAME = 'radio_bot',
+  YOUTUBE_API_KEY,
   HOST,
   PORT = 64738
 } = process.env
 
 const fetchPlaylist = async (pageToken = '') => {
-  const { data: { nextPageToken, items } } = await axios.get(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${PLAYLIST}&pageToken=${pageToken}&key=${API_KEY}`)
+  const query = qs({
+    part: 'snippet',
+    maxResults: 50,
+    playlistId: PLAYLIST,
+    pageToken: pageToken,
+    key: YOUTUBE_API_KEY
+  })
+
+  const { data: { nextPageToken, items } } = await axios.get(`https://www.googleapis.com/youtube/v3/playlistItems?${query}`)
 
   const snippets = items.map(({ snippet: { title, resourceId: { videoId: id } } }) => ({
     title, id
@@ -100,11 +109,11 @@ const nextSong = async () => {
     client.voiceConnection.emit('end')
   })
 
+  console.log(cache.nextItem.title)
   client.voiceConnection.playStream(stream)
   client.voiceConnection.once('end', nextSong)
 
   await client.sendMessage(cache.nextItem.title)
-  console.log(cache.nextItem.title)
 
   // Fetch next stream
   cache.nextItem = cache.playlist.pop()
