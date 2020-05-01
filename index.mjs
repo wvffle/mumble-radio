@@ -33,7 +33,7 @@ const getAudioStream = (id) => {
   })
 
   stream.once('error', err => {
-    console.error(err)
+    console.error('[YTDL]', err)
     stream.emit('end')
   })
 
@@ -49,6 +49,16 @@ const getAudioStream = (id) => {
 const client = new Noodle({
   name: NAME,
   url: HOST
+})
+
+client.voiceConnection.on('error', err => {
+  console.error('[VOICE]', err)
+  client.voiceConnection.emit('end')
+})
+
+client.on('error', err => {
+  console.error('[MUMBLE]', err)
+  client.voiceConnection.emit('end')
 })
 
 const cache = {
@@ -81,9 +91,17 @@ const nextSong = async () => {
   }
 
   const stream = cache.nextStream
+
+  stream.once('error', err => {
+    console.error('[FFMPEG]', err)
+    client.voiceConnection.emit('end')
+  })
+
   client.voiceConnection.playStream(stream)
   client.voiceConnection.once('end', nextSong)
+
   await client.sendMessage(cache.nextItem.title)
+  console.log(cache.nextItem.title)
 
   // Fetch next stream
   cache.nextItem = cache.playlist.pop()
