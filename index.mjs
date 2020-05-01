@@ -9,7 +9,9 @@ import ytdl from 'ytdl-core'
 import ffmpeg from 'fluent-ffmpeg'
 import dotenv from 'dotenv'
 import { stringify as qs } from 'querystring'
+import { createServer as http } from 'http'
 import { EventEmitter } from 'events'
+import websocket from 'websocket'
 import { readFileSync as readFile } from 'fs'
 
 dotenv.config()
@@ -22,6 +24,7 @@ const {
   YOUTUBE_API_KEY,
   HOST,
   PORT = 64738,
+  WEB_PORT,
   KEY_FILE,
   CERT_FILE
 } = process.env
@@ -165,5 +168,70 @@ bridge.on('ready', (client, voice) => {
   nextSong(client, voice)
 })
 
-console.log('starting client...')
-client.connect()
+if (WEB_PORT) {
+  console.log('starting web server...')
+
+  let song
+
+  const server = http((_, response) => {
+    response.writeHead(200, {
+      'Content-Type': 'text/html'
+    })
+
+    response.end(`<!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset='utf-8'>
+              <style>
+                body { font-family: JetBrains Mono, sans; font-size: 16px; color: #fff; margin: 0 }
+                p { background: linear-gradient(0, #0005, #0000 90%); line-height: 100px; margin: 0; padding-left: 100px; text-shadow: 3px 3px 3px #0005; transition: opacity .2s ease }
+              </style>
+          </head>
+          <body>
+            <p>${song}</p>
+            <script>
+              const ws = new WebSocket('ws://localhost:${WEB_PORT}')
+              const p = document.querySelector('p')
+
+              ws.onmessage = ({ data: song }) => {
+                p.textContent = song
+                p.style.opacity = 1
+
+                setTimeout(() => {
+                  p.style.opacity = 0
+                }, 2000)
+              }
+            </script>
+          </body>
+        </html>
+      `)
+  })
+
+  const websocketServer = new WebSocket({
+    httpServer: server
+  })
+
+  const clients = new Set()
+  websocketServer.on('request', request => {
+    const conn = request.accept(null, request.origin)
+    clients.add(conn)
+
+    if (song) {
+      conn.sendUTF(song)
+    }
+
+    conn.on('close', () => {
+      clients.remove(conn)
+    })
+  })
+
+  bridge.on('song', title => {
+    song = title
+
+    for (const client of clients) {
+      client.sendUTF(title)
+    }
+  })
+
+  server.listen(WEB_PORT)
+}
