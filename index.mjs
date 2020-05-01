@@ -149,7 +149,9 @@ const nextSong = async (client) => {
     }))
   })
 
-  // voice.once('end', () => nextSong(client))
+  decodedStream.once('end', () => {
+    nextSong(client)
+  })
 
   await client.user.channel.sendMessage(cache.nextItem.title)
 
