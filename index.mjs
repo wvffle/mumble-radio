@@ -92,6 +92,11 @@ mumble.connect(`mumble://${HOST}:${PORT}`, {
     return console.error('[MUMBLE]', err)
   }
 
+  conn.on('error', err => {
+    console.error('[MUMBLE]', err)
+    process.exit(1)
+  })
+
   conn.authenticate(NAME)
   conn.on('initialized', () => {
     bridge.emit('ready', conn)
