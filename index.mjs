@@ -7,11 +7,13 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
-const API_KEY = process.env.YOUTUBE_API_KEY
-const PLAYLIST = process.env.PLAYLIST || 'PLl2JADJwpokG_bQWijyL6td759TiIhGhw'
-
-const NAME = process.env.NAME || 'radio'
-const HOST = process.env.HOST
+const {
+  YOUTUBE_API_KEY: API_KEY,
+  PLAYLIST = 'PLl2JADJwpokG_bQWijyL6td759TiIhGhw',
+  NAME = 'radio_bot',
+  HOST,
+  PORT = 64738
+} = process.env
 
 const fetchPlaylist = async (pageToken = '') => {
   const { data: { nextPageToken, items } } = await axios.get(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${PLAYLIST}&pageToken=${pageToken}&key=${API_KEY}`)
@@ -48,7 +50,8 @@ const getAudioStream = (id) => {
 
 const client = new Noodle({
   name: NAME,
-  url: HOST
+  url: HOST,
+  port: PORT
 })
 
 client.voiceConnection.on('error', err => {
@@ -72,7 +75,7 @@ const fetchAndShuffle = async () => {
     const playlist = await fetchPlaylist()
     return [ ...cache.playlist, ...d3.shuffle(playlist) ]
   } catch (err) {
-    console.error(err)
+    console.error('[FETCH]', err)
     await client.sendMessage(`Error fetching playlist: ${err}`)
   }
 }
@@ -114,7 +117,9 @@ const nextSong = async () => {
 }
 
 client.on('ready', async event => {
+  console.log('connected!')
   nextSong()
 })
 
+console.log('starting client...')
 client.connect()
