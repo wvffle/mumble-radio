@@ -182,7 +182,24 @@ if (WEB_PORT) {
 
   let song
 
-  const server = http((_, response) => {
+  const styles = {
+    wvffle: `
+        body { font-family: JetBrains Mono, sans; font-size: 16px; color: #fff; margin: 0 }
+        p { background: linear-gradient(0, #0005, #0000 90%); line-height: 100px; margin: 0; padding-left: 100px; text-shadow: 3px 3px 3px #0005 }
+      `,
+    default: `
+        body { font-size: 16px; color: #fff; margin: 0 }
+        p { margin: 0 }
+      `
+  }
+
+  const server = http(({ url }, response) => {
+    let style = 'default'
+
+    if (url.slice(1) in styles) {
+      style = url.slice(1)
+    }
+
     response.writeHead(200, {
       'Content-Type': 'text/html'
     })
@@ -191,10 +208,7 @@ if (WEB_PORT) {
         <html>
           <head>
             <meta charset='utf-8'>
-              <style>
-                body { font-family: JetBrains Mono, sans; font-size: 16px; color: #fff; margin: 0 }
-                p { background: linear-gradient(0, #0005, #0000 90%); line-height: 100px; margin: 0; padding-left: 100px; text-shadow: 3px 3px 3px #0005 }
-              </style>
+              <style>${styles[style]}</style>
           </head>
           <body>
             <p>${song}</p>
