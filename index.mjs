@@ -150,7 +150,9 @@ const nextSong = async (client) => {
   })
 
   decodedStream.once('end', () => {
-    nextSong(client)
+    setTimeout(() => {
+      nextSong(client)
+    }, 2000)
   })
 
   await client.user.channel.sendMessage(cache.nextItem.title)
