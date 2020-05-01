@@ -186,7 +186,7 @@ if (WEB_PORT) {
             <meta charset='utf-8'>
               <style>
                 body { font-family: JetBrains Mono, sans; font-size: 16px; color: #fff; margin: 0 }
-                p { background: linear-gradient(0, #0005, #0000 90%); line-height: 100px; margin: 0; padding-left: 100px; text-shadow: 3px 3px 3px #0005; transition: opacity .2s ease }
+                p { background: linear-gradient(0, #0005, #0000 90%); line-height: 100px; margin: 0; padding-left: 100px; text-shadow: 3px 3px 3px #0005 }
               </style>
           </head>
           <body>
@@ -197,11 +197,6 @@ if (WEB_PORT) {
 
               ws.onmessage = ({ data: song }) => {
                 p.textContent = song
-                p.style.opacity = 1
-
-                setTimeout(() => {
-                  p.style.opacity = 0
-                }, 2000)
               }
             </script>
           </body>
