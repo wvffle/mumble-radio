@@ -223,7 +223,7 @@ if (WEB_PORT) {
     }
 
     conn.on('close', () => {
-      clients.remove(conn)
+      clients.delete(conn)
     })
   })
 
