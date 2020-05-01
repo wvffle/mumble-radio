@@ -194,7 +194,7 @@ if (WEB_PORT) {
           <body>
             <p>${song}</p>
             <script>
-              const ws = new WebSocket('ws://localhost:${WEB_PORT}')
+              const ws = new WebSocket('ws://' + location.hostname + ':${WEB_PORT}')
               const p = document.querySelector('p')
 
               ws.onmessage = ({ data: song }) => {
