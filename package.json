@@ -8,7 +8,9 @@
     "d3-array": "^2.4.0",
     "dotenv": "^8.2.0",
     "fluent-ffmpeg": "^2.1.2",
-    "noodle.js": "^1.3.0",
+    "lame": "^1.2.4",
+    "mumble": "^0.3.21",
+    "websocket": "^1.0.31",
     "ytdl-core": "^2.1.1"
   }
 }

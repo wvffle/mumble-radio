@@ -1,19 +1,29 @@
 import axios from 'axios'
-import Noodle from 'noodle.js'
+import lame from 'lame'
+
+// import Noodle from 'noodle.js'
+import mumble from 'mumble'
+
 import d3 from 'd3-array'
 import ytdl from 'ytdl-core'
 import ffmpeg from 'fluent-ffmpeg'
 import dotenv from 'dotenv'
 import { stringify as qs } from 'querystring'
+import { EventEmitter } from 'events'
+import { readFileSync as readFile } from 'fs'
 
 dotenv.config()
+
+const { server: WebSocket } = websocket
 
 const {
   PLAYLIST = 'PLl2JADJwpokG_bQWijyL6td759TiIhGhw',
   NAME = 'radio_bot',
   YOUTUBE_API_KEY,
   HOST,
-  PORT = 64738
+  PORT = 64738,
+  KEY_FILE,
+  CERT_FILE
 } = process.env
 
 const fetchPlaylist = async (pageToken = '') => {
@@ -38,7 +48,7 @@ const fetchPlaylist = async (pageToken = '') => {
   return snippets
 }
 
-const getAudioStream = (id) => {
+const getAudioStream = async (id) => {
   const stream = ytdl(id, {
     quality: 'highestaudio'
   })
@@ -49,28 +59,40 @@ const getAudioStream = (id) => {
   })
 
   // Normalize audio volume
-  return ffmpeg()
+  const ffmpegStream = ffmpeg()
     .input(stream)
     .noVideo()
-    .audioFilters('loudnorm')
     .format('mp3')
+    .audioFilters('loudnorm')
+    .audioFrequency(48000)
+    .audioChannels(1)
     .pipe()
+
+  return new Promise((resolve) => {
+    stream.on('info', (_, { audioChannels, audioBitrate }) => {
+      ffmpegStream.channels = audioChannels
+      ffmpegStream.sampleRate = audioBitrate
+
+      resolve(ffmpegStream)
+    })
+  })
 }
 
-const client = new Noodle({
-  name: NAME,
-  url: HOST,
-  port: PORT
-})
+const bridge = new EventEmitter()
 
-client.voiceConnection.on('error', err => {
-  console.error('[VOICE]', err)
-  client.voiceConnection.emit('end')
-})
+console.log('starting client...')
+mumble.connect(`mumble://${HOST}:${PORT}`, {
+  key: readFile(KEY_FILE),
+  cert: readFile(CERT_FILE)
+}, (err, conn) => {
+  if (err) {
+    return console.error('[MUMBLE]', err)
+  }
 
-client.on('error', err => {
-  console.error('[MUMBLE]', err)
-  client.voiceConnection.emit('end')
+  conn.authenticate(NAME)
+  conn.on('initialized', () => {
+    bridge.emit('ready', conn)
+  })
 })
 
 const cache = {
@@ -79,26 +101,29 @@ const cache = {
   nextItem: null
 }
 
-const fetchAndShuffle = async () => {
+const fetchAndShuffle = async (client) => {
   try {
     const playlist = await fetchPlaylist()
     return [ ...cache.playlist, ...d3.shuffle(playlist) ]
   } catch (err) {
     console.error('[FETCH]', err)
-    await client.sendMessage(`Error fetching playlist: ${err}`)
+
+    if (client) {
+      await client.user.channel.sendMessage(`Error fetching playlist: ${err}`)
+    }
   }
 }
 
-const nextSong = async () => {
+const nextSong = async (client) => {
   // Fetch if playlist is empty
   if (cache.playlist.length === 0) {
-    cache.playlist = await fetchAndShuffle()
+    cache.playlist = await fetchAndShuffle(client)
   }
 
   // Fetch stream if not fetched already
   if (cache.nextStream === null) {
     const curr = cache.playlist.pop()
-    cache.nextStream = getAudioStream(curr.id)
+    cache.nextStream = await getAudioStream(curr.id)
     cache.nextItem = curr
   }
 
@@ -106,28 +131,38 @@ const nextSong = async () => {
 
   stream.once('error', err => {
     console.error('[FFMPEG]', err)
-    client.voiceConnection.emit('end')
   })
 
-  console.log(cache.nextItem.title)
-  client.voiceConnection.playStream(stream)
-  client.voiceConnection.once('end', nextSong)
+  bridge.emit('song', cache.nextItem.title)
 
-  await client.sendMessage(cache.nextItem.title)
+  console.log(cache.nextItem.title)
+  const decoder = new lame.Decoder()
+  const decodedStream = stream.pipe(decoder)
+
+  decoder.on('format', format => {
+    decodedStream.pipe(client.inputStream({
+      channels: format.channels,
+      sampleRate: format.sampleRate
+    }))
+  })
+
+  // voice.once('end', () => nextSong(client))
+
+  await client.user.channel.sendMessage(cache.nextItem.title)
 
   // Fetch next stream
   cache.nextItem = cache.playlist.pop()
-  cache.nextStream = getAudioStream(cache.nextItem.id)
+  cache.nextStream = await getAudioStream(cache.nextItem.id)
 
   // Fetch if playlist has only 1 element
   if (cache.playlist.length === 1) {
-    cache.playlist = await fetchAndShuffle()
+    cache.playlist = await fetchAndShuffle(client)
   }
 }
 
-client.on('ready', async event => {
+bridge.on('ready', (client, voice) => {
   console.log('connected!')
-  nextSong()
+  nextSong(client, voice)
 })
 
 console.log('starting client...')
