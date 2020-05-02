@@ -43,7 +43,14 @@ const fetchPlaylist = async (pageToken = '') => {
 
   const snippets = items.map(({ snippet: { title, resourceId: { videoId: id } } }) => ({
     title, id
-  }))
+  })).filter(({ id }, i) => {
+    if (!id) {
+      console.log(`Song #${i} is broken`)
+      return false
+    }
+
+    return true
+  })
 
   if (nextPageToken) {
     return [ ...snippets, ...await fetchPlaylist(nextPageToken) ]
@@ -68,8 +75,7 @@ const getAudioStream = async (id) => {
     .pipe()
 
   stream.once('error', err => {
-    console.error('[YTDL]', err)
-    bridge.emit('yt:error')
+    bridge.emit('next', err)
   })
 
   return ffmpegStream
@@ -91,6 +97,11 @@ mumble.connect(`mumble://${HOST}:${PORT}`, {
     process.exit(1)
   })
 
+  conn.on('disconnect', () => {
+    console.error('The fuck, disconnect?')
+    process.exit(1)
+  })
+
   conn.authenticate(NAME)
   conn.on('initialized', () => {
     bridge.emit('ready', conn)
@@ -109,10 +120,6 @@ const fetchAndShuffle = async (client) => {
     return [ ...cache.playlist, ...d3.shuffle(playlist) ]
   } catch (err) {
     console.error('[FETCH]', err)
-
-    if (client) {
-      await client.user.channel.sendMessage(`Error fetching playlist: ${err}`)
-    }
   }
 }
 
@@ -124,9 +131,18 @@ const nextSong = async (client) => {
 
   // Fetch stream if not fetched already
   if (cache.nextStream === null) {
-    const curr = cache.playlist.pop()
-    cache.nextStream = await getAudioStream(curr.id)
-    cache.nextItem = curr
+    let error = false
+
+    do {
+      try {
+        error = false
+        cache.nextItem = cache.playlist.pop()
+        cache.nextStream = await getAudioStream(cache.nextItem.id)
+      } catch (err) {
+        error = true
+        console.log('Song is broken', cache.nextItem)
+      }
+    } while (error)
   }
 
   const stream = cache.nextStream
@@ -142,23 +158,49 @@ const nextSong = async (client) => {
   const decodedStream = stream.pipe(decoder)
 
   decoder.on('format', format => {
-    decodedStream.pipe(client.inputStream({
+    client.removeAllListeners([
+      'user-connect',
+      'user-disconnect'
+    ])
+
+    const users = client.users().map(({ session }) => session)
+
+    const input = client.inputStreamForUser(users, {
       channels: format.channels,
       sampleRate: format.sampleRate
-    }))
+    })
+
+    const { whisperId } = input
+
+    client.on('user-connect', ({ session }) => {
+      users.push(session)
+
+      client.connection.sendMessage('VoiceTarget', {
+        targets: [{ session: users }],
+        id: whisperId
+      })
+    })
+
+    client.on('user-disconnect', ({ session }) => {
+      users.splice(users.indexOf(session), 1)
+
+      client.connection.sendMessage('VoiceTarget', {
+        targets: [{ session: users }],
+        id: whisperId
+      })
+    })
+
+    input.once('finish', async () => {
+      await nextSong(client)
+    })
+
+    decodedStream.pipe(input)
   })
 
-  decodedStream.once('end', () => {
-    setTimeout(() => {
-      nextSong(client)
-    }, 2000)
-  })
-
-  await client.user.channel.sendMessage(cache.nextItem.title)
+  await client.user.setComment(cache.nextItem.title)
 
   // Fetch next stream
-  cache.nextItem = cache.playlist.pop()
-  cache.nextStream = await getAudioStream(cache.nextItem.id)
+  bridge.emit('next')
 
   // Fetch if playlist has only 1 element
   if (cache.playlist.length === 1) {
@@ -166,24 +208,33 @@ const nextSong = async (client) => {
   }
 }
 
-bridge.on('ready', (client, voice) => {
+bridge.on('ready', async (client, voice) => {
   console.log('connected!')
 
-  bridge.on('yt:error', async err => {
-    client.user.channel.sendMessage(`[ERROR] ${cache.nextItem.title} - ${err.message}`)
-    cache.nextItem = cache.playlist.pop()
-    cache.nextStream = await getAudioStream(cache.nextItem.id)
+  bridge.on('next', async () => {
+    try {
+      cache.nextItem = cache.playlist.pop()
+      cache.nextStream = await getAudioStream(cache.nextItem.id)
+    } catch (err) {
+      console.error(`[ERROR] ${cache.nextItem.title} - ${err.message}`)
+      bridge.emit('next')
+    }
   })
 
-  client.on('message', message => {
+  client.on('message', (message, user) => {
     if (message[0] !== '!') {
       return
     }
 
     switch (message.slice(1)) {
+      case 'h':
+      case 'help':
+        user.sendMessage('Commands: !help, !playlist, !list, !restart')
+        break
+
       case 'p':
       case 'playlist':
-        client.user.channel.sendMessage(`Playlist: ${PLAYLIST}`)
+        user.sendMessage(`Playlist: https://www.youtube.com/playlist?list=${PLAYLIST}`)
         break
 
       case 'r':
@@ -199,12 +250,12 @@ bridge.on('ready', (client, voice) => {
           .map(({ title }) => title)
           .join('<br>')
 
-        client.user.channel.sendMessage(`Songlist:<br>${list}`)
+        user.sendMessage(`Songlist:<br>${list}`)
         break
     }
   })
 
-  nextSong(client, voice)
+  await nextSong(client, voice)
 })
 
 if (WEB_PORT) {
