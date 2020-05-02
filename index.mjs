@@ -10,7 +10,7 @@ import ffmpeg from 'fluent-ffmpeg'
 import dotenv from 'dotenv'
 import { stringify as qs } from 'querystring'
 import { EventEmitter } from 'events'
-import { readFileSync as readFile, promises as fs, constants } from 'fs'
+import { readFileSync as readFile, promises as fs } from 'fs'
 import server from 'fastify'
 import websockets from 'fastify-websocket'
 import pug from 'pug'
@@ -232,6 +232,7 @@ if (WEB_PORT) {
   })
 
   fastify.get('/ws.js', async (request, reply) => {
+    reply.type('application/javascript')
     return fs.readFile('public/ws.js')
   })
 
