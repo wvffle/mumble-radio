@@ -9,14 +9,13 @@ import ytdl from 'ytdl-core'
 import ffmpeg from 'fluent-ffmpeg'
 import dotenv from 'dotenv'
 import { stringify as qs } from 'querystring'
-import { createServer as http } from 'http'
 import { EventEmitter } from 'events'
-import websocket from 'websocket'
-import { readFileSync as readFile } from 'fs'
+import { readFileSync as readFile, promises as fs } from 'fs'
+import server from 'fastify'
+import websockets from 'fastify-websocket'
+import { renderFile as render } from 'pug'
 
 dotenv.config()
-
-const { server: WebSocket } = websocket
 
 const {
   PLAYLIST = 'PLl2JADJwpokG_bQWijyL6td759TiIhGhw',
@@ -209,80 +208,55 @@ bridge.on('ready', (client, voice) => {
 if (WEB_PORT) {
   console.log('starting web server...')
 
+  const fastify = server()
+  fastify.register(websockets)
+
   let song
 
-  const styles = {
-    wvffle: `
-        body { font-family: JetBrains Mono, sans; font-size: 16px; color: #fff; margin: 0 }
-        p { background: linear-gradient(0, #0005, #0000 90%); line-height: 100px; margin: 0; padding-left: 100px; text-shadow: 3px 3px 3px #0005 }
-      `,
-    default: `
-        body { font-size: 16px; color: #fff; margin: 0 }
-        p { margin: 0 }
-      `
-  }
+  fastify.get('/obs/:style', async (request, reply) => {
+    const { style } = request.params
 
-  const server = http(({ url }, response) => {
-    let style = 'default'
-
-    if (url.slice(1) in styles) {
-      style = url.slice(1)
+    if (await fs.exists(`public/obs/${style}.pug`)) {
+      return render(`public/obs/${style}.pug`, {
+        song
+      })
     }
 
-    response.writeHead(200, {
-      'Content-Type': 'text/html'
+    return render('public/obs/plain.pug', {
+      song
     })
-
-    response.end(`<!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset='utf-8'>
-              <style>${styles[style]}</style>
-          </head>
-          <body>
-            <p>${song}</p>
-            <script>
-              const p = document.querySelector('p')
-
-              const connect = () => {
-                const ws = new WebSocket('ws://' + location.hostname + ':${WEB_PORT}')
-
-                ws.onmessage = ({ data: song }) => (p.textContent = song)
-                ws.onclose = () => setTimeout(connect, 5000)
-              }
-
-              connect()
-            </script>
-          </body>
-        </html>
-      `)
   })
 
-  const websocketServer = new WebSocket({
-    httpServer: server
-  })
-
-  const clients = new Set()
-  websocketServer.on('request', request => {
-    const conn = request.accept(null, request.origin)
-    clients.add(conn)
-
-    if (song) {
-      conn.sendUTF(song)
+  fastify.get('/api/v1/song', async (request, reply) => {
+    if (song === undefined) {
+      reply.code(425)
+      return { error: 'radio:loading' }
     }
 
-    conn.on('close', () => {
-      clients.delete(conn)
-    })
+    return { title: song }
+  })
+
+  fastify.get('/api/v1/list', async (request, reply) => {
+    return cache.playlist
+  })
+
+  // Websockets
+  fastify.get('/', { websocket: true }, ({ socket }) => {
+    socket.send(JSON.stringify({ title: song }))
   })
 
   bridge.on('song', title => {
     song = title
 
-    for (const client of clients) {
-      client.sendUTF(title)
+    // Send update to all websockets
+    for (const socket of fastify.websocketServer.clients) {
+      if (socket.readyState !== 1) {
+        continue
+      }
+
+      socket.send(JSON.stringify({ title: song }))
     }
   })
 
-  server.listen(WEB_PORT)
+  fastify.listen(WEB_PORT)
 }
