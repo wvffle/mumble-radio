@@ -174,6 +174,30 @@ bridge.on('ready', (client, voice) => {
     cache.nextStream = await getAudioStream(cache.nextItem.id)
   })
 
+  client.on('message', message => {
+    if (message[0] !== '!') {
+      return
+    }
+
+    switch (message.slice(1)) {
+      case 'p':
+      case 'playlist':
+        client.user.channel.sendMessage(`Playlist: ${PLAYLIST}`)
+        break
+
+      case 'r':
+      case 'restart':
+        console.log(`${'-'.repeat(7)}  RESTART  ${'-'.repeat(7)}`)
+        break
+
+      case 'l':
+      case 'list':
+      case 'songs':
+        `Songlist:<br>${cache.playlist.slice(-7).map(({ title }) => title).join('<br>')}`
+        break
+    }
+  })
+
   nextSong(client, voice)
 })
 
