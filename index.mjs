@@ -56,11 +56,6 @@ const getAudioStream = async (id) => {
     quality: 'highestaudio'
   })
 
-  stream.once('error', err => {
-    console.error('[YTDL]', err)
-    stream.emit('end')
-  })
-
   // Normalize audio volume
   const ffmpegStream = ffmpeg()
     .input(stream)
@@ -71,14 +66,12 @@ const getAudioStream = async (id) => {
     .audioChannels(1)
     .pipe()
 
-  return new Promise((resolve) => {
-    stream.on('info', (_, { audioChannels, audioBitrate }) => {
-      ffmpegStream.channels = audioChannels
-      ffmpegStream.sampleRate = audioBitrate
-
-      resolve(ffmpegStream)
-    })
+  stream.once('error', err => {
+    console.error('[YTDL]', err)
+    bridge.emit('yt:error')
   })
+
+  return ffmpegStream
 }
 
 const bridge = new EventEmitter()
@@ -174,6 +167,13 @@ const nextSong = async (client) => {
 
 bridge.on('ready', (client, voice) => {
   console.log('connected!')
+
+  bridge.on('yt:error', async err => {
+    client.user.channel.sendMessage(`[ERROR] ${cache.nextItem.title} - ${err.message}`)
+    cache.nextItem = cache.playlist.pop()
+    cache.nextStream = await getAudioStream(cache.nextItem.id)
+  })
+
   nextSong(client, voice)
 })
 
