@@ -1,7 +1,9 @@
 const p = document.querySelector('p')
 
+const protocol = location.protocol === 'http:' ? 'ws:' : 'wss:'
+
 const connect = () => {
-  const ws = new WebSocket(`wss://${location.hostname}`)
+  const ws = new WebSocket(`${protocol}//${location.host}`)
 
   ws.onmessage = ({ data }) => {
     const { title } = JSON.parse(data)

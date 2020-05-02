@@ -10,12 +10,14 @@ import ffmpeg from 'fluent-ffmpeg'
 import dotenv from 'dotenv'
 import { stringify as qs } from 'querystring'
 import { EventEmitter } from 'events'
-import { readFileSync as readFile, promises as fs } from 'fs'
+import { readFileSync as readFile, promises as fs, constants } from 'fs'
 import server from 'fastify'
 import websockets from 'fastify-websocket'
-import { renderFile as render } from 'pug'
+import pug from 'pug'
 
 dotenv.config()
+
+const { renderFile: render } = pug
 
 const {
   PLAYLIST = 'PLl2JADJwpokG_bQWijyL6td759TiIhGhw',
@@ -216,15 +218,21 @@ if (WEB_PORT) {
   fastify.get('/obs/:style', async (request, reply) => {
     const { style } = request.params
 
-    if (await fs.exists(`public/obs/${style}.pug`)) {
+    reply.type('html')
+
+    try {
       return render(`public/obs/${style}.pug`, {
         song
       })
-    }
+    } catch {}
 
     return render('public/obs/plain.pug', {
       song
     })
+  })
+
+  fastify.get('/ws.js', async (request, reply) => {
+    return fs.readFile('public/ws.js')
   })
 
   fastify.get('/api/v1/song', async (request, reply) => {
