@@ -188,12 +188,17 @@ bridge.on('ready', (client, voice) => {
       case 'r':
       case 'restart':
         console.log(`${'-'.repeat(7)}  RESTART  ${'-'.repeat(7)}`)
+        process.exit(0)
         break
 
       case 'l':
       case 'list':
       case 'songs':
-        `Songlist:<br>${cache.playlist.slice(-7).map(({ title }) => title).join('<br>')}`
+        const list = cache.playlist.slice(-7)
+          .map(({ title }) => title)
+          .join('<br>')
+
+        client.user.channel.sendMessage(`Songlist:<br>${list}`)
         break
     }
   })
