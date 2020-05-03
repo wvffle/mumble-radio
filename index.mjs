@@ -169,6 +169,7 @@ const nextSong = async (client) => {
   const decoder = new lame.Decoder()
   const decodedStream = stream.pipe(decoder)
 
+  cache.played.push(cache.nextItem.id)
   await fs.writeFile('.cache/data.json', JSON.stringify(cache.played))
 
   decoder.once('format', format => {
