@@ -122,7 +122,8 @@ const cache = {
   nextStream: null,
   nextItem: null,
   users: [],
-  whisperId: -1
+  whisperId: -1,
+  history: []
 }
 
 const fetchAndShuffle = async (client) => {
@@ -157,6 +158,7 @@ const nextSong = async (client) => {
     } while (error)
   }
 
+
   const stream = cache.nextStream
 
   stream.once('error', err => {
@@ -164,6 +166,7 @@ const nextSong = async (client) => {
   })
 
   bridge.emit('song', cache.nextItem)
+  cache.history.push(cache.nextItem)
 
   console.log(cache.nextItem.title)
   const decoder = new lame.Decoder()
@@ -222,9 +225,8 @@ bridge.on('ready', async (client, voice) => {
     }
 
     switch (message.slice(1)) {
-      case 'h':
       case 'help':
-        user.sendMessage('Commands: !help, !playlist, !list, !restart')
+        user.sendMessage('Commands: !help, !playlist, !list, !restart, !history')
         break
 
       case 'p':
@@ -241,11 +243,25 @@ bridge.on('ready', async (client, voice) => {
       case 'l':
       case 'list':
       case 'songs':
-        const list = cache.playlist.slice(-7)
-          .map(({ title }) => title)
-          .join('<br>')
+        {
+          const list = cache.playlist.slice(-7)
+            .reverse()
+            .map(({ title }) => title)
+            .join('<br>')
 
-        user.sendMessage(`Songlist:<br>${list}`)
+          user.sendMessage(`Songlist:<br>${list}`)
+        }
+        break
+
+      case 'h':
+      case 'history':
+        {
+          const list = cache.history.slice(-7)
+            .map(({ title }) => title)
+            .join('<br>')
+
+          user.sendMessage(`History:<br>${list}`)
+        }
         break
     }
   })
@@ -311,6 +327,10 @@ if (WEB_PORT) {
 
   fastify.get('/api/v1/list', async (request, reply) => {
     return [ cache.nextItem, ...cache.playlist.reverse() ]
+  })
+
+  fastify.get('/api/v1/history', async (request, reply) => {
+    return cache.history
   })
 
   // Websockets
