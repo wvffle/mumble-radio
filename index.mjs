@@ -40,7 +40,7 @@ const fetchPlaylist = async (pageToken = '') => {
   })
 
   try {
-    cache.played = JSON.parse(fs.readFile('.cache/data.json'))
+    cache.played = JSON.parse(await fs.readFile('.cache/data.json'))
   } catch {
     await fs.writeFile('.cache/data.json', [])
   }
