@@ -157,38 +157,17 @@ const nextSong = async (client) => {
   const decoder = new lame.Decoder()
   const decodedStream = stream.pipe(decoder)
 
-  decoder.on('format', format => {
-    client.removeAllListeners([
-      'user-connect',
-      'user-disconnect'
-    ])
-
+  decoder.once('format', format => {
     const users = client.users().map(({ session }) => session)
 
     const input = client.inputStreamForUser(users, {
       channels: format.channels,
-      sampleRate: format.sampleRate
+      sampleRate: format.sampleRate,
+      gain: 0.15
     })
 
-    const { whisperId } = input
-
-    client.on('user-connect', ({ session }) => {
-      users.push(session)
-
-      client.connection.sendMessage('VoiceTarget', {
-        targets: [{ session: users }],
-        id: whisperId
-      })
-    })
-
-    client.on('user-disconnect', ({ session }) => {
-      users.splice(users.indexOf(session), 1)
-
-      client.connection.sendMessage('VoiceTarget', {
-        targets: [{ session: users }],
-        id: whisperId
-      })
-    })
+    cache.users = users
+    cache.whisperId = input.whisperId
 
     input.once('finish', async () => {
       await nextSong(client)
@@ -256,6 +235,24 @@ bridge.on('ready', async (client, voice) => {
   })
 
   await nextSong(client, voice)
+
+  client.on('user-connect', ({ session }) => {
+    cache.users.push(session)
+
+    client.connection.sendMessage('VoiceTarget', {
+      targets: [{ session: cache.users }],
+      id: cache.whisperId
+    })
+  })
+
+  client.on('user-disconnect', ({ session }) => {
+    cache.users.splice(cache.users.indexOf(session), 1)
+
+    client.connection.sendMessage('VoiceTarget', {
+      targets: [{ session: cache.users }],
+      id: cache.whisperId
+    })
+  })
 })
 
 if (WEB_PORT) {
