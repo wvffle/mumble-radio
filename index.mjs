@@ -131,6 +131,7 @@ const fetchAndShuffle = async (client) => {
     return [ ...cache.playlist, ...d3.shuffle(playlist) ]
   } catch (err) {
     console.error('[FETCH]', err)
+    return cache.playlist
   }
 }
 
@@ -151,7 +152,7 @@ const nextSong = async (client) => {
         cache.nextStream = await getAudioStream(cache.nextItem.id)
       } catch (err) {
         error = true
-        console.log('Song is broken', cache.nextItem)
+        console.error('[FIRST]', cache.nextItem, err)
       }
     } while (error)
   }
