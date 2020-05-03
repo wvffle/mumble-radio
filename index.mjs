@@ -39,18 +39,26 @@ const fetchPlaylist = async (pageToken = '') => {
     key: YOUTUBE_API_KEY
   })
 
+  try {
+    cache.played = JSON.parse(fs.readFile('.cache/data.json'))
+  } catch {
+    await fs.writeFile('.cache/data.json', [])
+  }
+
   const { data: { nextPageToken, items } } = await axios.get(`https://www.googleapis.com/youtube/v3/playlistItems?${query}`)
 
-  const snippets = items.map(({ snippet: { title, resourceId: { videoId: id } } }) => ({
-    title, id
-  })).filter(({ id }, i) => {
-    if (!id) {
-      console.log(`Song #${i} is broken`)
-      return false
-    }
+  const snippets = items
+    .map(({ snippet: { title, resourceId: { videoId: id } } }) => ({
+      title, id
+    }))
+    .filter(({ id }, i) => {
+      if (!id) {
+        console.log(`Song #${i} is broken`)
+        return false
+      }
 
-    return true
-  })
+      return !cache.played.includes(id)
+    })
 
   if (nextPageToken) {
     return [ ...snippets, ...await fetchPlaylist(nextPageToken) ]
@@ -110,8 +118,11 @@ mumble.connect(`mumble://${HOST}:${PORT}`, {
 
 const cache = {
   playlist: [],
+  played: [],
   nextStream: null,
-  nextItem: null
+  nextItem: null,
+  users: [],
+  whisperId: -1
 }
 
 const fetchAndShuffle = async (client) => {
@@ -157,6 +168,8 @@ const nextSong = async (client) => {
   const decoder = new lame.Decoder()
   const decodedStream = stream.pipe(decoder)
 
+  await fs.writeFile('.cache/data.json', JSON.stringify(cache.played))
+
   decoder.once('format', format => {
     const users = client.users().map(({ session }) => session)
 
@@ -176,13 +189,14 @@ const nextSong = async (client) => {
     decodedStream.pipe(input)
   })
 
-  await client.user.setComment(cache.nextItem.title)
+  client.user.setComment(cache.nextItem.title)
 
   // Fetch next stream
   bridge.emit('next')
 
   // Fetch if playlist has only 1 element
   if (cache.playlist.length === 1) {
+    await fs.writeFile('.cache/data.json', JSON.stringify(cache.played = []))
     cache.playlist = await fetchAndShuffle(client)
   }
 }
