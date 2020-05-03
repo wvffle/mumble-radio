@@ -163,7 +163,7 @@ const nextSong = async (client) => {
     console.error('[FFMPEG]', err)
   })
 
-  bridge.emit('song', cache.nextItem.title)
+  bridge.emit('song', cache.nextItem)
 
   console.log(cache.nextItem.title)
   const decoder = new lame.Decoder()
@@ -286,12 +286,12 @@ if (WEB_PORT) {
 
     try {
       return render(`public/obs/${style}.pug`, {
-        song
+        song: song.title
       })
     } catch {}
 
     return render('public/obs/plain.pug', {
-      song
+      song: song.title
     })
   })
 
@@ -306,11 +306,11 @@ if (WEB_PORT) {
       return { error: 'radio:loading' }
     }
 
-    return { title: song }
+    return song
   })
 
   fastify.get('/api/v1/list', async (request, reply) => {
-    return cache.playlist
+    return [ cache.nextItem, ...cache.playlist.reverse() ]
   })
 
   // Websockets
@@ -318,8 +318,8 @@ if (WEB_PORT) {
     socket.send(JSON.stringify({ title: song }))
   })
 
-  bridge.on('song', title => {
-    song = title
+  bridge.on('song', data => {
+    song = data
 
     // Send update to all websockets
     for (const socket of fastify.websocketServer.clients) {
@@ -327,7 +327,7 @@ if (WEB_PORT) {
         continue
       }
 
-      socket.send(JSON.stringify({ title: song }))
+      socket.send(JSON.stringify(song))
     }
   })
 
