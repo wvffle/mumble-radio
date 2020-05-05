@@ -158,7 +158,6 @@ const nextSong = async (client) => {
     } while (error)
   }
 
-
   const stream = cache.nextStream
 
   stream.once('error', err => {
@@ -335,7 +334,7 @@ if (WEB_PORT) {
 
   // Websockets
   fastify.get('/', { websocket: true }, ({ socket }) => {
-    socket.send(JSON.stringify({ title: song }))
+    socket.send(JSON.stringify(song))
   })
 
   bridge.on('song', data => {
@@ -347,7 +346,7 @@ if (WEB_PORT) {
         continue
       }
 
-      socket.send(JSON.stringify(song))
+      socket.send(JSON.stringify(data))
     }
   })
 
