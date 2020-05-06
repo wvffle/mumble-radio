@@ -210,7 +210,7 @@ bridge.on('ready', async (client, voice) => {
 
   process.on('uncaughtException', (err) => {
     console.error(`[ERROR] ${cache.nextItem.title} - ${err.message}`)
-    console.erorr(err)
+    console.error(err)
     bridge.emit('next')
   })
 
