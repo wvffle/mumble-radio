@@ -208,6 +208,12 @@ const nextSong = async (client) => {
 bridge.on('ready', async (client, voice) => {
   console.log('connected!')
 
+  process.on('uncaughtException', (err) => {
+    console.error(`[ERROR] ${cache.nextItem.title} - ${err.message}`)
+    console.erorr(err)
+    bridge.emit('next')
+  })
+
   bridge.on('next', async () => {
     try {
       cache.nextItem = cache.playlist.pop()
