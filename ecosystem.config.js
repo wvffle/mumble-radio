@@ -1,7 +1,7 @@
 module.exports = {
   apps: [{
     name: 'radio.wvffle.net',
-    script: 'index.mjs',
+    script: 'pm2-start.js',
     node_args: '-r esm',
     watch: false
   }]
