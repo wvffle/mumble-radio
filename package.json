@@ -12,7 +12,7 @@
     "fluent-ffmpeg": "^2.1.2",
     "lame": "^1.2.4",
     "mumble": "^0.3.21",
-    "pug": "^2.0.4",
+    "pug": "^3.0.1",
     "ytdl-core": "^2.1.1"
   },
   "devDependencies": {
